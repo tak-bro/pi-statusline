@@ -24,7 +24,8 @@ export interface FooterCtx {
 	sessionManager?: { getBranch(): unknown[] } | undefined;
 }
 
-interface FooterData {
+/** Structural contract the footer needs from pi's footerData. */
+export interface FooterData {
 	getGitBranch(): string | null;
 	onBranchChange(cb: () => void): () => void;
 }
@@ -33,25 +34,25 @@ interface FooterData {
 let tui: { requestRender(): void } | null = null;
 
 /** Any handler wanting a repaint goes through here, never a captured TUI. */
-export function requestFooterRender(): void {
+const requestFooterRender = (): void => {
 	tui?.requestRender();
-}
+};
 
 /** "GLM-5.3 (preview)" + effort → "GLM-5.3 · high"; strips parens like statusline.sh. */
-export function identityLabel(model: string, effort: string | null | undefined): string {
+export const identityLabel = (model: string, effort: string | null | undefined): string => {
 	let label = model.replace(/\s*\([^)]*\)/g, "");
 	if (effort && effort !== "off") label += ` · ${effort}`;
 	return label;
-}
+};
 
 /** Context segment: colored bar + percent; percent null (right after compact) → empty bar, still drawn. */
-function metricsRow(ctx: FooterCtx): string {
+const metricsRow = (ctx: FooterCtx): string => {
 	const percent = ctx.getContextUsage?.()?.percent ?? null;
 	const bar = buildBar(percent ?? 0);
 	if (percent === null) return bar;
 	const shown = Math.round(percent);
 	return `${bar} ${paint(pickColor(shown), `${shown}%`)}`;
-}
+};
 
 // --- session usage (Decision D5: accumulate on turn_end, render() only reads the cache) ---
 
@@ -72,29 +73,40 @@ const emptyUsage = (): UsageTotals => ({ input: 0, output: 0, cost: 0, entriesSe
 let usage: UsageTotals = emptyUsage();
 
 /** Reset the running totals — session_start and branch-shrink recovery. */
-export function resetUsage(): void {
+export const resetUsage = (): void => {
 	usage = emptyUsage();
+};
+
+/** Structural slice of an assistant message's usage report. */
+interface MessageUsage {
+	input: number;
+	output: number;
+	cost?: { total: number } | undefined;
 }
 
-/** Sum assistant-message usage from `entries[fromIndex:]` — pure, exported for tests. */
-export function sumUsage(entries: readonly BranchEntry[], fromIndex = 0): { input: number; output: number; cost: number } {
+/** Sum assistant-message usage from `entries[fromIndex:]` — pure, exported for tests.
+ *  Takes `unknown[]` on purpose: pi's branch-entry shape narrows here, not at callsites. */
+export const sumUsage = (
+	entries: readonly unknown[],
+	fromIndex = 0,
+): { input: number; output: number; cost: number } => {
 	let input = 0;
 	let output = 0;
 	let cost = 0;
 	for (let i = fromIndex; i < entries.length; i++) {
-		const e = entries[i]!;
-		if (e.type !== "message" || e.message?.role !== "assistant") continue;
-		const u = e.message.usage;
+		const e = entries[i] as Partial<BranchEntry> | undefined;
+		if (e?.type !== "message" || e.message?.role !== "assistant") continue;
+		const u: MessageUsage | undefined = e.message.usage;
 		if (!u) continue;
 		input += u.input;
 		output += u.output;
 		cost += u.cost?.total ?? 0;
 	}
 	return { input, output, cost };
-}
+};
 
 /** Fold the branch's new tail into the cache; a shrunk branch recomputes from zero. */
-export function recordUsage(entries: readonly BranchEntry[]): void {
+export const recordUsage = (entries: readonly unknown[]): void => {
 	if (entries.length < usage.entriesSeen) resetUsage();
 	const delta = sumUsage(entries, usage.entriesSeen);
 	usage = {
@@ -103,18 +115,18 @@ export function recordUsage(entries: readonly BranchEntry[]): void {
 		cost: usage.cost + delta.cost,
 		entriesSeen: entries.length,
 	};
-}
+};
 
 /** Session segment: "1.2k · $0.50"; cost-0 providers show tokens only; nothing before the first reply. */
-function sessionSegment(): string {
+const sessionSegment = (): string => {
 	const tokens = usage.input + usage.output;
 	if (tokens <= 0) return "";
 	const cost = usage.cost > 0 ? ` · $${usage.cost.toFixed(2)}` : "";
 	return paint(COLOR.usage, `${fmtTokens(tokens)}${cost}`);
-}
+};
 
 /** tak-cc footer: identity row (model·effort | dir•branch) + metrics (context bar). */
-export function createFooter(ctx: FooterCtx, footerData: FooterData) {
+export const createFooter = (ctx: FooterCtx, footerData: FooterData) => {
 	return (t: { requestRender(): void }, _theme: unknown) => {
 		tui = t;
 		const unsubBranch = footerData.onBranchChange(requestFooterRender);
@@ -147,22 +159,22 @@ export function createFooter(ctx: FooterCtx, footerData: FooterData) {
 			},
 		};
 	};
-}
+};
 
-export default function (pi: ExtensionAPI) {
+export default (pi: ExtensionAPI) => {
 	pi.on("session_start", (_event, ctx) => {
 		resetUsage();
-		recordUsage((ctx.sessionManager?.getBranch() ?? []) as BranchEntry[]);
+		recordUsage(ctx.sessionManager?.getBranch() ?? []);
 		if (ctx.mode !== "tui") return; // footer is terminal-only
 		ctx.ui.setFooter((t, theme, footerData) => createFooter(ctx, footerData)(t, theme));
 	});
 
 	pi.on("turn_end", (_event, ctx) => {
-		recordUsage((ctx.sessionManager?.getBranch() ?? []) as BranchEntry[]);
+		recordUsage(ctx.sessionManager?.getBranch() ?? []);
 		requestFooterRender();
 	});
 
 	pi.on("model_select", () => {
 		requestFooterRender();
 	});
-}
+};

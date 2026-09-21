@@ -32,42 +32,40 @@ export const dim = (s: string) => `\x1b[2m${s}\x1b[22m`;
 export const paint = (color: string, s: string) => `${color}${s}${RESET}`;
 
 /** Usage color ramp: green < 50 ≤ yellow < 75 ≤ rose < 90 ≤ red. */
-export function pickColor(pct: number): string {
+export const pickColor = (pct: number): string => {
 	if (pct >= 90) return rgb(225, 85, 100);
 	if (pct >= 75) return rgb(225, 130, 160);
 	if (pct >= 50) return rgb(230, 195, 110);
 	return rgb(130, 215, 145);
-}
+};
 
 /**
  * Progress bar. `pct` is clamped to 0..100; a non-zero percentage always shows
  * at least one filled cell so the bar visibly reacts on the first turn.
  */
-export function buildBar(pct: number, width = BAR_WIDTH, color = pickColor(pct)): string {
+export const buildBar = (pct: number, width = BAR_WIDTH, color = pickColor(pct)): string => {
 	const p = Math.min(100, Math.max(0, pct));
 	let filled = Math.round((p * width) / 100);
 	if (p > 0 && filled === 0) filled = 1;
 	if (filled > width) filled = width;
 	return `${color}${"█".repeat(filled)}${RESET}${COLOR.barEmpty}${"░".repeat(width - filled)}${RESET}`;
-}
+};
 
 /** Compact token count: 913 → "913", 1234 → "1.2k", 45_000_000 → "45.0M". */
-export function fmtTokens(n: number): string {
+export const fmtTokens = (n: number): string => {
 	if (n < 1000) return `${n}`;
 	if (n < 1_000_000) return `${(n / 1000).toFixed(1)}k`;
 	return `${(n / 1_000_000).toFixed(1)}M`;
-}
+};
 
 /** "3h 12m" / "12m" — time until an ISO timestamp, or "" when it has passed. */
-export function fmtUntil(iso: string, now = Date.now()): string {
+export const fmtUntil = (iso: string, now = Date.now()): string => {
 	const ms = Date.parse(iso) - now;
 	if (!Number.isFinite(ms) || ms <= 0) return "";
 	const minutes = Math.floor(ms / 60_000);
 	const hours = Math.floor(minutes / 60);
 	return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
-}
+};
 
 /** Join non-empty parts with `sep`, ignoring the blanks. */
-export function join(parts: string[], sep: string): string {
-	return parts.filter((p) => p !== "").join(sep);
-}
+export const join = (parts: string[], sep: string): string => parts.filter((p) => p !== "").join(sep);
