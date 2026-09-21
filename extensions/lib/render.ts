@@ -57,5 +57,19 @@ export const fmtTokens = (n: number): string => {
 	return `${(n / 1_000_000).toFixed(1)}M`;
 };
 
+/**
+ * Session cost. Two decimals read as `$0.00` on cheap providers — a 15k-token turn on
+ * glm-5.3-flash bills a fraction of a cent — so widen the precision until the figure is
+ * non-zero, up to four places. Below that the amount is not worth a segment: return "".
+ */
+export const fmtCost = (cost: number): string => {
+	if (!(cost > 0)) return "";
+	for (const places of [2, 3, 4]) {
+		const text = cost.toFixed(places);
+		if (Number(text) > 0) return `$${text}`;
+	}
+	return "";
+};
+
 /** Join non-empty parts with `sep`, ignoring the blanks. */
 export const join = (parts: string[], sep: string): string => parts.filter((p) => p !== "").join(sep);

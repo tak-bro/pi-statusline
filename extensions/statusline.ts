@@ -12,7 +12,7 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { basename } from "node:path";
-import { buildBar, COLOR, DOT, RESET, SEP, bold, fmtTokens, join, paint, pickColor } from "./lib/render.ts";
+import { buildBar, COLOR, DOT, RESET, SEP, bold, fmtCost, fmtTokens, join, paint, pickColor } from "./lib/render.ts";
 import { pack } from "./lib/layout.ts";
 
 /** Structural slice of pi's ExtensionContext the footer reads at render time. */
@@ -135,7 +135,8 @@ export const recordUsage = (entries: readonly unknown[]): void => {
 const sessionSegment = (): string => {
 	const tokens = usage.input + usage.cached + usage.output;
 	if (tokens <= 0) return "";
-	const cost = usage.cost > 0 ? ` · $${usage.cost.toFixed(2)}` : "";
+	const money = fmtCost(usage.cost);
+	const cost = money === "" ? "" : ` · ${money}`;
 	return paint(COLOR.usage, `${fmtTokens(tokens)}${cost}`);
 };
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { COLOR, RESET, buildBar, fmtTokens, pickColor } from "./render.ts";
+import { COLOR, RESET, buildBar, fmtCost, fmtTokens, pickColor } from "./render.ts";
 
 describe("pickColor", () => {
 	test("boundaries flip at 50 / 75 / 90", () => {
@@ -40,5 +40,22 @@ describe("buildBar", () => {
 
 	test("0% fills nothing", () => {
 		expect(buildBar(0)).toBe(bar(0, pickColor(0)));
+	});
+});
+
+describe("fmtCost", () => {
+	test("two decimals once the amount is at least a cent", () => {
+		expect(fmtCost(1.5)).toBe("$1.50");
+		expect(fmtCost(0.04)).toBe("$0.04");
+	});
+
+	test("widens precision rather than printing $0.00 \u2014 a cheap provider's turn is sub-cent", () => {
+		expect(fmtCost(0.004)).toBe("$0.004");
+		expect(fmtCost(0.0004)).toBe("$0.0004");
+	});
+
+	test("drops the segment when even four places round to zero, and when there is no cost", () => {
+		expect(fmtCost(0.00001)).toBe("");
+		expect(fmtCost(0)).toBe("");
 	});
 });
