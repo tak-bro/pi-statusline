@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createFooter, identityLabel } from "../statusline.ts";
+import { SEP, buildBar, pickColor, RESET } from "./render.ts";
 
 /** Minimal host stand-ins — the factory only touches these shapes. */
 function makeCtx(overrides: Partial<{ model: { id: string; name?: string }; thinkingLevel?: string }> = {}) {
@@ -64,18 +65,44 @@ describe("createFooter dispose wiring", () => {
 	});
 });
 
+describe("createFooter metrics — context bar", () => {
+	test("percent 42 → bar + colored '42%'", () => {
+		const tui = makeTui();
+		const data = makeFooterData(null);
+		const ctx = makeCtx({ model: { id: "m" }, getContextUsage: () => ({ percent: 42 }) });
+		const component = createFooter(ctx, data as never)(tui, {});
+		const [row] = component.render(200);
+		expect(row.endsWith(`${pickColor(42)}42%${RESET}`)).toBe(true);
+		expect(row).toContain("█".repeat(4));
+	});
+
+	test("percent null (right after compact) → empty bar drawn, no percent text", () => {
+		const tui = makeTui();
+		const data = makeFooterData(null);
+		const ctx = makeCtx({ model: { id: "m" }, getContextUsage: () => ({ percent: null }) });
+		const component = createFooter(ctx, data as never)(tui, {});
+		const [row] = component.render(200);
+		expect(row).toContain("░".repeat(10));
+		expect(row).not.toContain("%\x1b[0m");
+		expect(row.endsWith("%")).toBe(false);
+	});
+});
+
 describe("createFooter render — tak-cc SGR bytes", () => {
 	test("identity row: model(orange,bold) SEP dir(cyan,bold) DOT branch(purple,bold)", () => {
 		const tui = makeTui();
 		const data = makeFooterData("feat/x");
 		const component = createFooter(makeCtx({ model: { id: "glm-5.3", name: "GLM-5.3" }, thinkingLevel: "high" }), data as never)(tui, {});
 		const [row] = component.render(120);
+		// slice 02: the context segment is always drawn — no usage data → empty bar
 		expect(row).toBe(
 			"\x1b[38;5;208m\x1b[1mGLM-5.3 · high\x1b[22m\x1b[0m" +
-				"\x1b[90m | \x1b[0m" +
+				SEP +
 				"\x1b[1m\x1b[38;2;76;208;222mproj\x1b[22m\x1b[0m" +
 				"\x1b[90m • \x1b[0m" +
-				"\x1b[1m\x1b[38;2;192;103;222mfeat/x\x1b[22m\x1b[0m",
+				"\x1b[1m\x1b[38;2;192;103;222mfeat/x\x1b[22m\x1b[0m" +
+				SEP +
+				buildBar(0),
 		);
 	});
 
@@ -86,8 +113,10 @@ describe("createFooter render — tak-cc SGR bytes", () => {
 		const [row] = component.render(120);
 		expect(row).toBe(
 			"\x1b[38;5;208m\x1b[1mGLM-5.3\x1b[22m\x1b[0m" +
-				"\x1b[90m | \x1b[0m" +
-				"\x1b[1m\x1b[38;2;76;208;222mproj\x1b[22m\x1b[0m",
+				SEP +
+				"\x1b[1m\x1b[38;2;76;208;222mproj\x1b[22m\x1b[0m" +
+				SEP +
+				buildBar(0),
 		);
 	});
 });

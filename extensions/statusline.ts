@@ -12,14 +12,15 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { basename } from "node:path";
-import { truncateToWidth } from "@earendil-works/pi-tui";
-import { COLOR, DOT, RESET, SEP, bold, join, paint } from "./lib/render.ts";
+import { buildBar, COLOR, DOT, RESET, SEP, bold, join, paint, pickColor } from "./lib/render.ts";
+import { pack } from "./lib/layout.ts";
 
 /** Structural slice of pi's ExtensionContext the footer reads at render time. */
 export interface FooterCtx {
 	cwd: string;
 	model?: { id: string; name?: string } | undefined;
 	thinkingLevel?: string | undefined;
+	getContextUsage?: (() => { percent: number | null } | undefined) | undefined;
 }
 
 interface FooterData {
@@ -42,7 +43,16 @@ export function identityLabel(model: string, effort: string | null | undefined):
 	return label;
 }
 
-/** tak-cc identity row: model(orange·bold) | dir(cyan·bold) • branch(purple·bold). */
+/** Context segment: colored bar + percent; percent null (right after compact) → empty bar, still drawn. */
+function metricsRow(ctx: FooterCtx): string {
+	const percent = ctx.getContextUsage?.()?.percent ?? null;
+	const bar = buildBar(percent ?? 0);
+	if (percent === null) return bar;
+	const shown = Math.round(percent);
+	return `${bar} ${paint(pickColor(shown), `${shown}%`)}`;
+}
+
+/** tak-cc footer: identity row (model·effort | dir•branch) + metrics (context bar). */
 export function createFooter(ctx: FooterCtx, footerData: FooterData) {
 	return (t: { requestRender(): void }, _theme: unknown) => {
 		tui = t;
@@ -72,7 +82,7 @@ export function createFooter(ctx: FooterCtx, footerData: FooterData) {
 					parts.push(group);
 				}
 
-				return [truncateToWidth(join(parts, SEP), width)];
+				return pack(join(parts, SEP), metricsRow(ctx), width);
 			},
 		};
 	};
