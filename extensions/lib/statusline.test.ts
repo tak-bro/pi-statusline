@@ -1,0 +1,93 @@
+import { describe, expect, test } from "bun:test";
+import { createFooter, identityLabel } from "../statusline.ts";
+
+/** Minimal host stand-ins — the factory only touches these shapes. */
+function makeCtx(overrides: Partial<{ model: { id: string; name?: string }; thinkingLevel?: string }> = {}) {
+	return { cwd: "/tmp/proj", ...overrides };
+}
+
+function makeFooterData(branch: string | null) {
+	const listeners: Array<() => void> = [];
+	return {
+		getGitBranch: () => branch,
+		onBranchChange: (cb: () => void) => {
+			listeners.push(cb);
+			return () => {
+				const i = listeners.indexOf(cb);
+				if (i >= 0) listeners.splice(i, 1);
+			};
+		},
+		notify: () => listeners.forEach((l) => l()),
+		subscribed: () => listeners.length,
+	};
+}
+
+function makeTui() {
+	return { renders: 0, requestRender() { this.renders++; } };
+}
+
+describe("identityLabel", () => {
+	test("appends effort after the model name", () => {
+		expect(identityLabel("GLM-5.3", "high")).toBe("GLM-5.3 · high");
+	});
+
+	test("strips parenthesized suffixes like statusline.sh's sed", () => {
+		expect(identityLabel("Opus 4.5 (preview)", "medium")).toBe("Opus 4.5 · medium");
+	});
+
+	test("no effort, or effort off, leaves the bare name", () => {
+		expect(identityLabel("GLM-5.3", undefined)).toBe("GLM-5.3");
+		expect(identityLabel("GLM-5.3", "off")).toBe("GLM-5.3");
+	});
+});
+
+describe("createFooter dispose wiring", () => {
+	test("dispose clears the parked TUI — later renders are no-ops, not crashes", () => {
+		const tui = makeTui();
+		const data = makeFooterData("main");
+		const component = createFooter(makeCtx({ model: { id: "m" } }), data as never)(tui, {});
+		component.dispose();
+		// a turn_end after dispose would call requestRender on the parked (dead) TUI
+		expect(() => component.invalidate()).not.toThrow();
+	});
+
+	test("branch change requests a render; after dispose the unsubscribe ran", () => {
+		const tui = makeTui();
+		const data = makeFooterData("main");
+		const component = createFooter(makeCtx({ model: { id: "m" } }), data as never)(tui, {});
+		expect(data.subscribed()).toBe(1);
+		data.notify();
+		expect(tui.renders).toBe(1);
+		component.dispose();
+		data.notify();
+		expect(tui.renders).toBe(1); // unsubscribed — no render into the dying TUI
+	});
+});
+
+describe("createFooter render — tak-cc SGR bytes", () => {
+	test("identity row: model(orange,bold) SEP dir(cyan,bold) DOT branch(purple,bold)", () => {
+		const tui = makeTui();
+		const data = makeFooterData("feat/x");
+		const component = createFooter(makeCtx({ model: { id: "glm-5.3", name: "GLM-5.3" }, thinkingLevel: "high" }), data as never)(tui, {});
+		const [row] = component.render(120);
+		expect(row).toBe(
+			"\x1b[38;5;208m\x1b[1mGLM-5.3 · high\x1b[22m\x1b[0m" +
+				"\x1b[90m | \x1b[0m" +
+				"\x1b[1m\x1b[38;2;76;208;222mproj\x1b[22m\x1b[0m" +
+				"\x1b[90m • \x1b[0m" +
+				"\x1b[1m\x1b[38;2;192;103;222mfeat/x\x1b[22m\x1b[0m",
+		);
+	});
+
+	test("no branch → no DOT tail; no effort → bare model", () => {
+		const tui = makeTui();
+		const data = makeFooterData(null);
+		const component = createFooter(makeCtx({ model: { id: "glm-5.3", name: "GLM-5.3" } }), data as never)(tui, {});
+		const [row] = component.render(120);
+		expect(row).toBe(
+			"\x1b[38;5;208m\x1b[1mGLM-5.3\x1b[22m\x1b[0m" +
+				"\x1b[90m | \x1b[0m" +
+				"\x1b[1m\x1b[38;2;76;208;222mproj\x1b[22m\x1b[0m",
+		);
+	});
+});

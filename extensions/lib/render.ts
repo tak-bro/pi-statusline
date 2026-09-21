@@ -11,7 +11,7 @@
 export const BAR_WIDTH = 10; // cells in the context bar
 export const SEP_W = 3; // visible width of " | " and " • "
 
-const RESET = "\x1b[0m";
+export const RESET = "\x1b[0m";
 
 export const SEP = `\x1b[90m | ${RESET}`;
 export const DOT = `\x1b[90m • ${RESET}`;
