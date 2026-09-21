@@ -5,7 +5,10 @@
 	"pi": {
 		"extensions": ["./extensions"]
 	},
-	"files": ["extensions/", "README.md"],
+	"files": ["extensions/", "!extensions/**/*.test.ts", "README.md", "LICENSE"],
+	"scripts": {
+		"test": "bun test"
+	},
 	"keywords": [
 		"pi",
 		"statusline",

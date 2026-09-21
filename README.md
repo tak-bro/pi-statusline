@@ -16,8 +16,12 @@ GLM-5.3 · high | proj • feat/x
 - **dir • branch** — working directory basename and git branch (matches statusline.sh)
 - **context bar** — 10 cells of context-window usage; empty right after compaction
   until the next reply reports usage
-- **tokens · cost** — session totals. Cost comes from the provider's catalog unit
-  price as reported by pi — the number is only as accurate as that catalog.
+- **tokens · cost** — session totals. Tokens are every billed token — input, output,
+  and cache reads and writes — so the count and the dollar figure cover the same thing;
+  on a cache-heavy provider an input-only count would read an order of magnitude low.
+  Cost comes from the provider's catalog unit price as reported by pi, so the number is
+  only as accurate as that catalog. A provider whose catalog carries no rates reports
+  zero, and the segment then shows tokens alone rather than a permanent `$0.00`.
 
 ## Layout rule
 
@@ -30,5 +34,5 @@ Requires the host (`@earendil-works/pi-coding-agent` and `pi-tui`) at runtime;
 they are declared as `peerDependencies`.
 
 ```sh
-pi pm add ./pi-statusline   # or: pi -e /path/to/pi-statusline
+pi install ./pi-statusline   # or, to try it for one run: pi -e /path/to/pi-statusline
 ```

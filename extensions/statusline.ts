@@ -59,17 +59,24 @@ const metricsRow = (ctx: FooterCtx): string => {
 /** Structural slice of a session-branch entry the accumulator understands. */
 export interface BranchEntry {
 	type: string;
-	message?: { role: string; usage?: { input: number; output: number; cost?: { total: number } } } | undefined;
+	message?:
+		| {
+				role: string;
+				usage?: { input: number; output: number; cacheRead?: number; cacheWrite?: number; cost?: { total: number } };
+		  }
+		| undefined;
 }
 
 export interface UsageTotals {
 	input: number;
 	output: number;
+	/** cacheRead + cacheWrite. Billed like the rest, so `cost` already covers them. */
+	cached: number;
 	cost: number;
 	entriesSeen: number;
 }
 
-const emptyUsage = (): UsageTotals => ({ input: 0, output: 0, cost: 0, entriesSeen: 0 });
+const emptyUsage = (): UsageTotals => ({ input: 0, output: 0, cached: 0, cost: 0, entriesSeen: 0 });
 let usage: UsageTotals = emptyUsage();
 
 /** Reset the running totals — session_start and branch-shrink recovery. */
@@ -81,6 +88,8 @@ export const resetUsage = (): void => {
 interface MessageUsage {
 	input: number;
 	output: number;
+	cacheRead?: number | undefined;
+	cacheWrite?: number | undefined;
 	cost?: { total: number } | undefined;
 }
 
@@ -89,9 +98,10 @@ interface MessageUsage {
 export const sumUsage = (
 	entries: readonly unknown[],
 	fromIndex = 0,
-): { input: number; output: number; cost: number } => {
+): { input: number; output: number; cached: number; cost: number } => {
 	let input = 0;
 	let output = 0;
+	let cached = 0;
 	let cost = 0;
 	for (let i = fromIndex; i < entries.length; i++) {
 		const e = entries[i] as Partial<BranchEntry> | undefined;
@@ -100,18 +110,22 @@ export const sumUsage = (
 		if (!u) continue;
 		input += u.input;
 		output += u.output;
+		cached += (u.cacheRead ?? 0) + (u.cacheWrite ?? 0);
 		cost += u.cost?.total ?? 0;
 	}
-	return { input, output, cost };
+	return { input, output, cached, cost };
 };
 
-/** Fold the branch's new tail into the cache; a shrunk branch recomputes from zero. */
+/** Fold the branch's new tail into the cache.
+ *  A shrunk branch recomputes from zero — belt to the braces of `session_start`, which the
+ *  host re-emits with reason "fork" on /tree and /clone and which already resets the totals. */
 export const recordUsage = (entries: readonly unknown[]): void => {
 	if (entries.length < usage.entriesSeen) resetUsage();
 	const delta = sumUsage(entries, usage.entriesSeen);
 	usage = {
 		input: usage.input + delta.input,
 		output: usage.output + delta.output,
+		cached: usage.cached + delta.cached,
 		cost: usage.cost + delta.cost,
 		entriesSeen: entries.length,
 	};
@@ -119,7 +133,7 @@ export const recordUsage = (entries: readonly unknown[]): void => {
 
 /** Session segment: "1.2k · $0.50"; cost-0 providers show tokens only; nothing before the first reply. */
 const sessionSegment = (): string => {
-	const tokens = usage.input + usage.output;
+	const tokens = usage.input + usage.cached + usage.output;
 	if (tokens <= 0) return "";
 	const cost = usage.cost > 0 ? ` · $${usage.cost.toFixed(2)}` : "";
 	return paint(COLOR.usage, `${fmtTokens(tokens)}${cost}`);

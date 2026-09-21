@@ -7,7 +7,7 @@ beforeEach(() => resetUsage());
 /** One assistant reply: 100 in / 20 out / $0.50. */
 const assistantEntry = {
 	type: "message",
-	message: { role: "assistant", usage: { input: 100, output: 20, cost: { total: 0.5 } } },
+	message: { role: "assistant", usage: { input: 100, output: 20, cacheRead: 300, cacheWrite: 50, cost: { total: 0.5 } } },
 };
 
 /** Minimal host stand-ins — the factory only touches these shapes. */
@@ -54,15 +54,21 @@ describe("sumUsage — incremental assistant-message totals", () => {
 	const U = { type: "message", message: { role: "user" } };
 
 	test("sums assistant usage only", () => {
-		expect(sumUsage([U, assistantEntry, U, assistantEntry])).toEqual({ input: 200, output: 40, cost: 1 });
+		expect(sumUsage([U, assistantEntry, U, assistantEntry])).toEqual({ input: 200, output: 40, cached: 700, cost: 1 });
 	});
 
 	test("fromIndex skips already-counted entries", () => {
-		expect(sumUsage([assistantEntry, assistantEntry, assistantEntry], 2)).toEqual({ input: 100, output: 20, cost: 0.5 });
+		expect(sumUsage([assistantEntry, assistantEntry, assistantEntry], 2)).toEqual({ input: 100, output: 20, cached: 350, cost: 0.5 });
+	});
+
+	test("counts cacheRead and cacheWrite \u2014 cost.total bills them, so the token figure must too", () => {
+		const noCache = { type: "message", message: { role: "assistant", usage: { input: 100, output: 20, cost: { total: 0.5 } } } };
+		expect(sumUsage([noCache])).toEqual({ input: 100, output: 20, cached: 0, cost: 0.5 });
+		expect(sumUsage([assistantEntry]).cached).toBe(350);
 	});
 
 	test("assistant message without usage is skipped", () => {
-		expect(sumUsage([{ type: "message", message: { role: "assistant" } }])).toEqual({ input: 0, output: 0, cost: 0 });
+		expect(sumUsage([{ type: "message", message: { role: "assistant" } }])).toEqual({ input: 0, output: 0, cached: 0, cost: 0 });
 	});
 });
 
@@ -114,14 +120,14 @@ describe("createFooter metrics — context bar", () => {
 
 describe("createFooter usage segment — session tokens·cost", () => {
 
-	test("accumulated usage → '120 · $0.50' painted usage color after the bar", () => {
+	test("accumulated usage → '940 · $1.00' painted usage color after the bar", () => {
 		const tui = makeTui();
 		const data = makeFooterData(null);
 		recordUsage([assistantEntry, assistantEntry]);
 		const ctx = makeCtx({ model: { id: "m" } });
 		const component = createFooter(ctx, data)(tui, {});
 		const [row] = component.render(200);
-		expect(row.endsWith(`${COLOR.usage}240 · $1.00${RESET}`)).toBe(true);
+		expect(row.endsWith(`${COLOR.usage}940 · $1.00${RESET}`)).toBe(true);
 	});
 
 	test("cost total 0 → tokens only, no '$' (provider-0-cost fallback)", () => {
@@ -151,7 +157,7 @@ describe("createFooter usage segment — session tokens·cost", () => {
 		const ctx = makeCtx({ model: { id: "m" } });
 		const component = createFooter(ctx, makeFooterData(null))(tui, {});
 		const [row] = component.render(200);
-		expect(row.endsWith(`${COLOR.usage}120 · $0.50${RESET}`)).toBe(true);
+		expect(row.endsWith(`${COLOR.usage}470 · $0.50${RESET}`)).toBe(true);
 	});
 });
 

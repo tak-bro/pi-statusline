@@ -28,7 +28,6 @@ export const COLOR = {
 } as const;
 
 export const bold = (s: string) => `\x1b[1m${s}\x1b[22m`;
-export const dim = (s: string) => `\x1b[2m${s}\x1b[22m`;
 export const paint = (color: string, s: string) => `${color}${s}${RESET}`;
 
 /** Usage color ramp: green < 50 ≤ yellow < 75 ≤ rose < 90 ≤ red. */
@@ -56,15 +55,6 @@ export const fmtTokens = (n: number): string => {
 	if (n < 1000) return `${n}`;
 	if (n < 1_000_000) return `${(n / 1000).toFixed(1)}k`;
 	return `${(n / 1_000_000).toFixed(1)}M`;
-};
-
-/** "3h 12m" / "12m" — time until an ISO timestamp, or "" when it has passed. */
-export const fmtUntil = (iso: string, now = Date.now()): string => {
-	const ms = Date.parse(iso) - now;
-	if (!Number.isFinite(ms) || ms <= 0) return "";
-	const minutes = Math.floor(ms / 60_000);
-	const hours = Math.floor(minutes / 60);
-	return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
 };
 
 /** Join non-empty parts with `sep`, ignoring the blanks. */
