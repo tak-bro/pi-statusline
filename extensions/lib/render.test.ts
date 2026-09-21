@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { COLOR, RESET, buildBar, pickColor } from "./render.ts";
+import { COLOR, RESET, buildBar, fmtTokens, pickColor } from "./render.ts";
 
 describe("pickColor", () => {
 	test("boundaries flip at 50 / 75 / 90", () => {
@@ -9,6 +9,14 @@ describe("pickColor", () => {
 		expect(pickColor(75)).toBe("\x1b[38;2;225;130;160m"); // rose
 		expect(pickColor(89)).toBe("\x1b[38;2;225;130;160m"); // rose
 		expect(pickColor(90)).toBe("\x1b[38;2;225;85;100m"); // red
+	});
+});
+
+describe("fmtTokens", () => {
+	test("compact boundaries", () => {
+		expect(fmtTokens(913)).toBe("913");
+		expect(fmtTokens(1234)).toBe("1.2k");
+		expect(fmtTokens(45_000_000)).toBe("45.0M");
 	});
 });
 
