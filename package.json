@@ -1,5 +1,5 @@
 {
-	"name": "pi-statusline",
+	"name": "@tak-bro/pi-statusline",
 	"version": "0.1.0",
 	"description": "tak-cc-statusline look for pi — a footer extension with model, effort, directory, branch, context bar, and session usage",
 	"pi": {
