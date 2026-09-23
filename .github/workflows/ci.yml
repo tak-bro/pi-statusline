@@ -38,6 +38,6 @@ jobs:
             echo "::error::tag v$TAG != package.json $VERSION"
             exit 1
           fi
-      - run: npm publish --provenance
+      - run: npm publish --provenance --access public # scoped → public 명시 필요
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

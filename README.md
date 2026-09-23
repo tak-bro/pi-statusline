@@ -37,5 +37,6 @@ Requires the host (`@earendil-works/pi-coding-agent` and `pi-tui`) at runtime;
 they are declared as `peerDependencies`.
 
 ```sh
-pi install ./pi-statusline   # or, to try it for one run: pi -e /path/to/pi-statusline
+pi install @tak-bro/pi-statusline   # from npm
+pi install ./pi-statusline          # or local checkout; try one run: pi -e /path/to/pi-statusline
 ```
