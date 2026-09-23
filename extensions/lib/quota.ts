@@ -6,7 +6,7 @@
  * Used in the wild by zai-quota-hud and zai_quotecheck; may break without notice.
  */
 
-import { COLOR, paint, pickColor, RESET } from "./render.ts";
+import { COLOR, paint, pickColor } from "./render.ts";
 
 /** One CREDIT_LIMIT entry. `number`+`unit` name the window (unit 3 = hours, 6 = weeks — inferred, unverified). */
 export interface QuotaLimit {
@@ -50,7 +50,7 @@ export const formatCountdown = (nextResetTime: number, now = Date.now()): string
 	return h > 0 ? `${h}h${String(m).padStart(2, "0")}m` : `${m}m`;
 };
 
-/** "ZAI 5% · 5h,24% · 1w" style — one entry per limit, colored by remaining headroom. */
+/** "ZAI 5% · 5h ⏳1h30m | 24% · 1w" style — one entry per limit, colored by remaining headroom. */
 export const formatQuota = (data: QuotaData, now = Date.now()): string => {
 	const parts = data.limits.map((l) => {
 		const pct = Math.round(l.percentage);
@@ -99,8 +99,10 @@ export const quotaSegment = (apiKey: string | undefined, onUpdate: () => void): 
 	// serve the stale value one last time, then refresh in the background
 	const stale = cache?.text ?? null;
 	void fetchQuota(apiKey).then((data) => {
-		cache = { text: data ? formatQuota(data) : null, at: Date.now() };
-		if (cache.text) onUpdate();
+		if (data) cache = { text: formatQuota(data), at: Date.now() };
+		// on failure keep serving the last good text; retry after a full TTL
+		else cache = stale !== null ? { text: stale, at: Date.now() } : null;
+		if (cache?.text) onUpdate();
 	});
 	cache = { text: null, at: Date.now() };
 	return stale;
