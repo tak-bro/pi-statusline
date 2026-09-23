@@ -35,11 +35,10 @@ export const parseQuota = (json: unknown): QuotaData | null => {
 	return data as QuotaData;
 };
 
-const UNIT_LABEL: Record<number, string> = { 3: "h", 6: "w" };
+const unitLabel = (unit: number, number: number): string =>
+	unit === 3 ? `${number}h` : unit === 6 ? `${number * 7}d` : `${number}${unit}`;
 
-const unitLabel = (unit: number): string => UNIT_LABEL[unit] ?? `${unit}`;
-
-/** Countdown "1h23m" until epoch-ms reset time; empty when absent or past. */
+/** Countdown "1h 36m" or "36m" until epoch-ms reset time; empty when absent or past. */
 export const formatCountdown = (nextResetTime: number, now = Date.now()): string => {
 	if (!nextResetTime) return "";
 	const ms = nextResetTime - now;
@@ -47,19 +46,22 @@ export const formatCountdown = (nextResetTime: number, now = Date.now()): string
 	const min = Math.ceil(ms / 60_000);
 	const h = Math.floor(min / 60);
 	const m = min % 60;
-	return h > 0 ? `${h}h${String(m).padStart(2, "0")}m` : `${m}m`;
+	return h > 0 ? `${h}h ${m}m` : `${m}m`;
 };
 
-/** "ZAI 5% · 5h ⏳1h30m | 24% · 1w" style — one entry per limit, colored by remaining headroom. */
+/** "5h 25% (1h 36m)" — window label, percent, reset countdown in parens. */
+export const formatLimit = (l: QuotaLimit, now = Date.now()): string => {
+	const pct = Math.round(l.percentage);
+	let text = `${unitLabel(l.unit, l.number)} ${pct}%`;
+	const cd = formatCountdown(l.nextResetTime, now);
+	if (cd) text += ` (${cd})`;
+	return paint(pickColor(pct), text);
+};
+
+/** "ZAI 5h 25% (1h 36m) • 7d 83% (20h 36m)" — one entry per limit. */
 export const formatQuota = (data: QuotaData, now = Date.now()): string => {
-	const parts = data.limits.map((l) => {
-		const pct = Math.round(l.percentage);
-		let text = `${pct}% · ${l.number}${unitLabel(l.unit)}`;
-		const cd = formatCountdown(l.nextResetTime, now);
-		if (cd) text += ` ⏳${cd}`;
-		return paint(pickColor(pct), text);
-	});
-	return `${paint(COLOR.usage, "ZAI ")}${parts.join(paint(COLOR.usage, " | "))}`;
+	const parts = data.limits.map((l) => formatLimit(l, now));
+	return `${paint(COLOR.usage, "ZAI ")}${parts.join(paint(COLOR.usage, " • "))}`;
 };
 
 const ENDPOINT = "https://api.z.ai/api/monitor/usage/quota/limit";

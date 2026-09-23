@@ -33,7 +33,7 @@ describe("parseQuota", () => {
 
 describe("formatCountdown", () => {
 	test("hours+minutes", () => {
-		expect(formatCountdown(NOW + 83 * 60_000, NOW)).toBe("1h23m");
+		expect(formatCountdown(NOW + 83 * 60_000, NOW)).toBe("1h 23m");
 	});
 	test("minutes only", () => {
 		expect(formatCountdown(NOW + 5 * 60_000, NOW)).toBe("5m");
@@ -45,16 +45,17 @@ describe("formatCountdown", () => {
 });
 
 describe("formatQuota", () => {
-	test("renders one segment per limit with window label and countdown", () => {
+	test("renders one segment per limit: window, percent, countdown in parens", () => {
 		const text = formatQuota(parseQuota(sample) as QuotaData, NOW);
-		expect(text).toContain("5% · 5h ⏳1h30m");
-		expect(text).toContain("24% · 1w ⏳48h00m");
+		expect(text).toContain("5h 5% (1h 30m)");
+		expect(text).toContain("7d 24% (48h 0m)");
+		expect(text).toContain(" • ");
 	});
 	test("drops countdown when reset time passed", () => {
 		const data = parseQuota(sample) as QuotaData;
 		data.limits = [{ ...data.limits[0], nextResetTime: NOW - 1 }];
 		const text = formatQuota(data, NOW);
-		expect(text).toContain("5% · 5h");
-		expect(text).not.toContain("⏳");
+		expect(text).toContain("5h 5%");
+		expect(text).not.toContain("(");
 	});
 });
