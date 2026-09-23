@@ -49,11 +49,11 @@ export const formatCountdown = (nextResetTime: number, now = Date.now()): string
 	return h > 0 ? `${h}h ${m}m` : `${m}m`;
 };
 
-/** "5h 25% (1h 36m)" — window label, percent, reset countdown in parens; neutral gray, no ramp. */
+/** "5h 25% (1h 36m)" — label+percent in usage gray, reset countdown dimmed. */
 export const formatLimit = (l: QuotaLimit, now = Date.now()): string => {
 	let text = `${unitLabel(l.unit, l.number)} ${Math.round(l.percentage)}%`;
 	const cd = formatCountdown(l.nextResetTime, now);
-	if (cd) text += ` (${cd})`;
+	if (cd) text += paint(COLOR.dim, ` (${cd})`);
 	return paint(COLOR.usage, text);
 };
 

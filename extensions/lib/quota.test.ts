@@ -47,8 +47,10 @@ describe("formatCountdown", () => {
 describe("formatQuota", () => {
 	test("renders one segment per limit: window, percent, countdown in parens", () => {
 		const text = formatQuota(parseQuota(sample) as QuotaData, NOW);
-		expect(text).toContain("5h 5% (1h 30m)");
-		expect(text).toContain("7d 24% (48h 0m)");
+		expect(text).toContain("5h 5%");
+		expect(text).toContain("(1h 30m)");
+		expect(text).toContain("7d 24%");
+		expect(text).toContain("(48h 0m)");
 		expect(text).toContain(" • ");
 	});
 	test("drops countdown when reset time passed", () => {

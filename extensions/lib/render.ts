@@ -25,6 +25,7 @@ export const COLOR = {
 	branch: rgb(192, 103, 222), // purple
 	barEmpty: rgb(80, 85, 95),
 	usage: rgb(156, 162, 175),
+	dim: "\x1b[90m", // countdowns, separators
 } as const;
 
 export const bold = (s: string) => `\x1b[1m${s}\x1b[22m`;
