@@ -14,6 +14,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { basename } from "node:path";
 import { buildBar, COLOR, DOT, RESET, SEP, bold, fmtCost, fmtTokens, join, paint, pickColor } from "./lib/render.ts";
 import { pack } from "./lib/layout.ts";
+import { quotaSegment, resetQuotaCache } from "./lib/quota.ts";
 
 /** Structural slice of pi's ExtensionContext the footer reads at render time. */
 export interface FooterCtx {
@@ -140,6 +141,10 @@ const sessionSegment = (): string => {
 	return paint(COLOR.usage, `${fmtTokens(tokens)}${cost}`);
 };
 
+/** Z.ai coding-plan quota, hidden when no key or while the first fetch is in flight. */
+const quotaSegmentCached = (): string | null =>
+	quotaSegment(process.env.ZAI_API_KEY, requestFooterRender);
+
 /** tak-cc footer: identity row (model·effort | dir•branch) + metrics (context bar). */
 export const createFooter = (ctx: FooterCtx, footerData: FooterData) => {
 	return (t: { requestRender(): void }, _theme: unknown) => {
@@ -170,7 +175,11 @@ export const createFooter = (ctx: FooterCtx, footerData: FooterData) => {
 					parts.push(group);
 				}
 
-				return pack(join(parts, SEP), join([metricsRow(ctx), sessionSegment()], SEP), width);
+				return pack(
+					join(parts, SEP),
+					join([metricsRow(ctx), quotaSegmentCached() ?? "", sessionSegment()], SEP),
+					width,
+				);
 			},
 		};
 	};
@@ -179,6 +188,7 @@ export const createFooter = (ctx: FooterCtx, footerData: FooterData) => {
 export default (pi: ExtensionAPI) => {
 	pi.on("session_start", (_event, ctx) => {
 		resetUsage();
+		resetQuotaCache();
 		recordUsage(ctx.sessionManager?.getBranch() ?? []);
 		if (ctx.mode !== "tui") return; // footer is terminal-only
 		ctx.ui.setFooter((t, theme, footerData) => createFooter(ctx, footerData)(t, theme));
