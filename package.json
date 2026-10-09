@@ -1,11 +1,18 @@
 {
 	"name": "@tak-bro/pi-statusline",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "tak-cc-statusline look for pi — a footer extension with model, effort, directory, branch, context bar, and session usage",
 	"pi": {
-		"extensions": ["./extensions"]
+		"extensions": [
+			"./extensions"
+		]
 	},
-	"files": ["extensions/", "!extensions/**/*.test.ts", "README.md", "LICENSE"],
+	"files": [
+		"extensions/",
+		"!extensions/**/*.test.ts",
+		"README.md",
+		"LICENSE"
+	],
 	"scripts": {
 		"test": "bun test"
 	},
