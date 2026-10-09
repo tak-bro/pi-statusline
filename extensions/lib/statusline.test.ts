@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, test } from "bun:test";
-import { createFooter, FooterData, identityLabel, recordUsage, resetUsage, sumUsage } from "../statusline.ts";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { createFooter, FooterData, identityLabel, quotaKey, recordUsage, resetUsage, sumUsage } from "../statusline.ts";
 import { COLOR, SEP, buildBar, pickColor, RESET } from "./render.ts";
 
 beforeEach(() => resetUsage());
@@ -191,5 +191,32 @@ describe("createFooter render — tak-cc SGR bytes", () => {
 				SEP +
 				buildBar(0),
 		);
+	});
+});
+
+describe("quotaKey", () => {
+	const registry = (keys: Record<string, string>) => ({
+		cwd: "/tmp",
+		modelRegistry: { getApiKeyForProvider: async (p: string) => keys[p] },
+	});
+	const saved = process.env.ZAI_API_KEY;
+	afterEach(() => {
+		if (saved === undefined) delete process.env.ZAI_API_KEY;
+		else process.env.ZAI_API_KEY = saved;
+	});
+
+	test("asks pi's registry for the active provider's key", async () => {
+		delete process.env.ZAI_API_KEY;
+		expect(await quotaKey(registry({ anthropic: "oat" }), "anthropic")).toBe("oat");
+		expect(await quotaKey(registry({}), "openai-codex")).toBeUndefined();
+	});
+	test("ZAI_API_KEY overrides the registry for zai only", async () => {
+		process.env.ZAI_API_KEY = "env-key";
+		expect(await quotaKey(registry({ zai: "stored" }), "zai")).toBe("env-key");
+		expect(await quotaKey(registry({ anthropic: "oat" }), "anthropic")).toBe("oat");
+	});
+	test("no registry → undefined", async () => {
+		delete process.env.ZAI_API_KEY;
+		expect(await quotaKey({ cwd: "/tmp" }, "anthropic")).toBeUndefined();
 	});
 });

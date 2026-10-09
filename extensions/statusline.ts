@@ -11,17 +11,16 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { basename } from "node:path";
 import { buildBar, COLOR, DOT, RESET, SEP, bold, fmtCost, fmtTokens, join, paint, pickColor } from "./lib/render.ts";
 import { pack } from "./lib/layout.ts";
-import { quotaSegment, resetQuotaCache } from "./lib/quota.ts";
+import { quotaHostMatches, quotaSegment, resetQuotaCache } from "./lib/quota.ts";
 
 /** Structural slice of pi's ExtensionContext the footer reads at render time. */
 export interface FooterCtx {
 	cwd: string;
-	model?: { id: string; name?: string } | undefined;
+	model?: { id: string; name?: string; provider?: string; baseUrl?: string } | undefined;
+	modelRegistry?: { getApiKeyForProvider(provider: string): Promise<string | undefined> } | undefined;
 	thinkingLevel?: string | undefined;
 	getContextUsage?: (() => { percent: number | null } | undefined) | undefined;
 	sessionManager?: { getBranch(): unknown[] } | undefined;
@@ -143,28 +142,20 @@ const sessionSegment = (): string => {
 	return paint(COLOR.usage, `${fmtTokens(tokens)}${cost}`);
 };
 
-// --- Z.ai key: explicit env override, else the token pi itself authenticates with ---
+// --- quota credential: the key pi itself uses for the active provider ---
 
-let authKey: string | null | undefined;
-
-/** `ZAI_API_KEY` env, else `~/.pi/agent/auth.json` → `.zai.key`; memoized (undefined = not read yet). */
-const zaiApiKey = (): string | undefined => {
-	if (process.env.ZAI_API_KEY) return process.env.ZAI_API_KEY;
-	if (authKey !== undefined) return authKey ?? undefined;
-	try {
-		const auth = JSON.parse(readFileSync(`${homedir()}/.pi/agent/auth.json`, "utf8")) as {
-			zai?: { key?: string };
-		};
-		authKey = typeof auth.zai?.key === "string" && auth.zai.key ? auth.zai.key : null;
-	} catch {
-		authKey = null;
-	}
-	return authKey ?? undefined;
+/** `ZAI_API_KEY` env wins for zai; otherwise pi's registry, which also refreshes OAuth tokens. */
+export const quotaKey = async (ctx: FooterCtx, provider: string): Promise<string | undefined> => {
+	if (provider === "zai" && process.env.ZAI_API_KEY) return process.env.ZAI_API_KEY;
+	return ctx.modelRegistry?.getApiKeyForProvider(provider);
 };
 
-/** Z.ai coding-plan quota, hidden when no key or while the first fetch is in flight. */
-const quotaSegmentCached = (): string | null =>
-	quotaSegment(zaiApiKey(), requestFooterRender);
+/** Subscription quota of the active model's provider; hidden when unsupported, keyless, or not fetched yet. */
+const quotaText = (ctx: FooterCtx): string | null => {
+	const provider = ctx.model?.provider;
+	if (provider && !quotaHostMatches(provider, ctx.model?.baseUrl)) return null;
+	return quotaSegment(provider, () => quotaKey(ctx, provider ?? ""), requestFooterRender);
+};
 
 /** tak-cc footer: identity row (model·effort | dir•branch) + metrics (context bar). */
 export const createFooter = (ctx: FooterCtx, footerData: FooterData) => {
@@ -198,7 +189,7 @@ export const createFooter = (ctx: FooterCtx, footerData: FooterData) => {
 
 				return pack(
 					join(parts, SEP),
-					join([metricsRow(ctx), quotaSegmentCached() ?? "", sessionSegment()], SEP),
+					join([metricsRow(ctx), quotaText(ctx) ?? "", sessionSegment()], SEP),
 					width,
 				);
 			},
